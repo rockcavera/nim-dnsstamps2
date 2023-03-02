@@ -47,7 +47,7 @@ type
 const
   dnsStampUri = "sdns://"
 
-proc setAddress(ip: string, port: Port, standardPort: Port, address: var string) =
+proc setAddress(ip: string, port: Port, standardPort: static[Port], address: var string) =
   let ipAddr = parseIpAddress(ip)
 
   case ipAddr.family
@@ -58,11 +58,12 @@ proc setAddress(ip: string, port: Port, standardPort: Port, address: var string)
   of IpAddressFamily.IPv4:
     add(address, ip)
 
-  if port != standardPort:
-    add(address, ':')
-    add(address, $port)
+  when standardPort != Port(0):
+    if port != standardPort:
+      add(address, ':')
+      add(address, $port)
 
-proc initPlainDNS*(ip: string, port: Port, props: set[StampProps]): StampObj =
+proc initPlainDNSStamp*(ip: string, port: Port, props: set[StampProps] = {}): StampObj =
   result = StampObj(
     address: newStringOfCap(47),
     props: props,
@@ -70,8 +71,8 @@ proc initPlainDNS*(ip: string, port: Port, props: set[StampProps]): StampObj =
 
   setAddress(ip, port, Port(53), result.address)
 
-proc initDNSCryptStamp*(ip: string, port: Port, providerName: string, pk: array[32, byte],
-                        props: set[StampProps]): StampObj =
+proc initDNSCryptStamp*(ip: string, port: Port = Port(443), providerName: string,
+                        pk: array[32, byte], props: set[StampProps] = {}): StampObj =
   result = StampObj(
     address: newStringOfCap(47),
     props: props,
@@ -83,6 +84,111 @@ proc initDNSCryptStamp*(ip: string, port: Port, providerName: string, pk: array[
 
   if not startsWith(providerName, "2.dnscrypt-cert."):
     result.providerName = "2.dnscrypt-cert." & providerName
+
+proc initDoHStamp*(ip: string = "", hostname: string, port: Port = Port(443), hashes: seq[string],
+                   path: string = "/dns-query", bootstrapIps: seq[string] = @[],
+                   props: set[StampProps] = {}): StampObj =
+  result = StampObj(
+    address: newStringOfCap(47),
+    props: props,
+    protocol: StampProto.DoH,
+    hashes: hashes,
+    hostname: newStringOfCap(260), # 254 hostname + 6 :PORT
+    path: path,
+    bootstrapIps: bootstrapIps)
+
+  if ip != "":
+    setAddress(ip, port, Port(0), result.address)
+
+  add(result.hostname, hostname)
+
+  if port != Port(443):
+    add(result.hostname, ':')
+    add(result.hostname, $port)
+
+proc initDoTStamp*(ip: string = "", hostname: string, port: Port = Port(443), hashes: seq[string],
+                   bootstrapIps: seq[string] = @[], props: set[StampProps] = {}): StampObj =
+  result = StampObj(
+    address: newStringOfCap(47),
+    props: props,
+    protocol: StampProto.DoT,
+    hashes: hashes,
+    hostname: newStringOfCap(260), # 254 hostname + 6 :PORT
+    path: "",
+    bootstrapIps: bootstrapIps)
+
+  if ip != "":
+    setAddress(ip, port, Port(0), result.address)
+
+  add(result.hostname, hostname)
+
+  if port != Port(443):
+    add(result.hostname, ':')
+    add(result.hostname, $port)
+
+proc initDoQStamp*(ip: string = "", hostname: string, port: Port = Port(443), hashes: seq[string],
+                   bootstrapIps: seq[string] = @[], props: set[StampProps] = {}): StampObj =
+  result = StampObj(
+    address: newStringOfCap(47),
+    props: props,
+    protocol: StampProto.DoQ,
+    hashes: hashes,
+    hostname: newStringOfCap(260), # 254 hostname + 6 :PORT
+    path: "",
+    bootstrapIps: bootstrapIps)
+
+  if ip != "":
+    setAddress(ip, port, Port(0), result.address)
+
+  add(result.hostname, hostname)
+
+  if port != Port(443):
+    add(result.hostname, ':')
+    add(result.hostname, $port)
+
+proc initODoHTargetStamp*(hostname: string, port: Port = Port(443), path: string = "/dns-query",
+                          props: set[StampProps] = {}): StampObj =
+  result = StampObj(
+    address: "",
+    props: props,
+    protocol: StampProto.ODoHTarget,
+    hashes: @[],
+    hostname: newStringOfCap(260), # 254 hostname + 6 :PORT
+    path: "",
+    bootstrapIps: @[])
+
+  add(result.hostname, hostname)
+
+  if port != Port(443):
+    add(result.hostname, ':')
+    add(result.hostname, $port)
+
+proc initDNSCryptRelayStamp*(ip: string, port: Port = Port(443)): StampObj =
+  result = StampObj(
+    address: newStringOfCap(47),
+    props: {},
+    protocol: StampProto.DNSCryptRelay)
+
+  setAddress(ip, port, Port(443), result.address)
+
+proc initODoHRelayStamp*(ip: string = "", hostname: string, port: Port = Port(443), hashes: seq[string], path: string = "/dns-query", bootstrapIps: seq[string] = @[], props: set[StampProps] = {}): StampObj =
+  result = StampObj(
+    address: newStringOfCap(47),
+    props: props,
+    protocol: StampProto.ODoHRelay,
+    hashes: hashes,
+    hostname: newStringOfCap(260), # 254 hostname + 6 :PORT
+    path: path,
+    bootstrapIps: bootstrapIps)
+
+  if ip != "":
+    setAddress(ip, port, Port(0), result.address)
+
+  add(result.hostname, hostname)
+
+  if port != Port(443):
+    add(result.hostname, ':')
+    add(result.hostname, $port)
 
 template writeLP(ss: StringStream, str: string) =
   write(ss, uint8(len(str)))
@@ -243,7 +349,7 @@ when isMainModule:
 
   let b = parseStamp("sdns://AQEAAAAAAAAAD1syNjIwOjA6Y2NjOjoyXSC3NRFAIG8iXT4r2CLX_WkeocM8yNZmjQy-BL-rykP7eRsyLmRuc2NyeXB0LWNlcnQub3BlbmRucy5jb20")
 
-  let c = initPlainDNS("8.8.8.8", Port(53), {DNSSEC})
+  let c = initPlainDNSStamp("8.8.8.8", Port(53), {DNSSEC})
 
   doAssert(toStamp(c) == "sdns://AAEAAAAAAAAABzguOC44Ljg")
 
