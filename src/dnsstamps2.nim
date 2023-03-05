@@ -36,7 +36,7 @@ type
     props*: set[StampProps]
     case protocol*: StampProto
     of StampProto.DoH, StampProto.DoT, StampProto.DoQ, StampProto.ODoHTarget, StampProto.ODoHRelay:
-      hashes*: seq[string]
+      hashes*: seq[array[32, byte]]
       hostname*: string
       path*: string
       bootstrapIps*: seq[string]
@@ -113,9 +113,9 @@ proc initDNSCryptStamp*(ip: string, port: Port = Port(443), providerName: string
   if not startsWith(providerName, "2.dnscrypt-cert."):
     result.providerName = "2.dnscrypt-cert." & providerName
 
-proc initDoHStamp*(ip: string = "", hostname: string, port: Port = Port(443), hashes: seq[string],
-                   path: string = "/dns-query", bootstrapIps: seq[string] = @[],
-                   props: set[StampProps] = {}): StampObj =
+proc initDoHStamp*(ip: string = "", hostname: string, port: Port = Port(443),
+                   hashes: seq[array[32, byte]], path: string = "/dns-query",
+                   bootstrapIps: seq[string] = @[], props: set[StampProps] = {}): StampObj =
   result = StampObj(
     address: newStringOfCap(39), # IPv6
     props: props,
@@ -130,8 +130,9 @@ proc initDoHStamp*(ip: string = "", hostname: string, port: Port = Port(443), ha
 
   setHostname(hostname, port, Port(443), result.hostname)
 
-proc initDoTStamp*(ip: string = "", hostname: string, port: Port = Port(443), hashes: seq[string],
-                   bootstrapIps: seq[string] = @[], props: set[StampProps] = {}): StampObj =
+proc initDoTStamp*(ip: string = "", hostname: string, port: Port = Port(443),
+                   hashes: seq[array[32, byte]], bootstrapIps: seq[string] = @[],
+                   props: set[StampProps] = {}): StampObj =
   result = StampObj(
     address: newStringOfCap(39), # IPv6
     props: props,
@@ -146,8 +147,9 @@ proc initDoTStamp*(ip: string = "", hostname: string, port: Port = Port(443), ha
 
   setHostname(hostname, port, Port(443), result.hostname)
 
-proc initDoQStamp*(ip: string = "", hostname: string, port: Port = Port(443), hashes: seq[string],
-                   bootstrapIps: seq[string] = @[], props: set[StampProps] = {}): StampObj =
+proc initDoQStamp*(ip: string = "", hostname: string, port: Port = Port(443),
+                   hashes: seq[array[32, byte]], bootstrapIps: seq[string] = @[],
+                   props: set[StampProps] = {}): StampObj =
   result = StampObj(
     address: newStringOfCap(39), # IPv6
     props: props,
@@ -184,7 +186,7 @@ proc initDNSCryptRelayStamp*(ip: string, port: Port = Port(443)): StampObj =
   setAddress(ip, port, Port(443), result.address)
 
 proc initODoHRelayStamp*(ip: string = "", hostname: string, port: Port = Port(443),
-                         hashes: seq[string], path: string = "/dns-query",
+                         hashes: seq[array[32, byte]], path: string = "/dns-query",
                          bootstrapIps: seq[string] = @[], props: set[StampProps] = {}): StampObj =
   result = StampObj(
     address: newStringOfCap(39), # IPv6
@@ -200,16 +202,16 @@ proc initODoHRelayStamp*(ip: string = "", hostname: string, port: Port = Port(44
 
   setHostname(hostname, port, Port(443), result.hostname)
 
-template writeLP(ss: StringStream, str: string) =
-  write(ss, uint8(len(str)))
-  write(ss, str)
+template writeLP[T: string|array[32, byte]](ss: StringStream, data: T) =
+  write(ss, uint8(len(data)))
+  write(ss, data)
 
-template writeVLP(ss: StringStream, seqStr: seq[string]) =
-  for i in 0 ..< high(seqStr):
-    write(ss, uint8(len(seqStr[i])) or 0x80'u8)
-    write(ss, seqStr[i])
+template writeVLP[T: string|array[32, byte]](ss: StringStream, seqT: seq[T]) =
+  for i in 0 ..< high(seqT):
+    write(ss, uint8(len(seqT[i])) or 0x80'u8)
+    write(ss, seqT[i])
 
-  writeLP(ss, seqStr[^1])
+  writeLP(ss, seqT[^1])
 
 template toUint64(x: set[StampProps]): uint64 =
   when nimvm:
@@ -237,8 +239,7 @@ proc toStamp*(stamp: StampObj): string =
 
   case stamp.protocol
   of StampProto.DNSCrypt:
-    write(ss, 32'u8)
-    write(ss, stamp.pk)
+    writeLP(ss, stamp.pk)
 
     writeLP(ss, stamp.providerName)
   of StampProto.DoH, StampProto.DoT, StampProto.DoQ, StampProto.ODoHTarget, StampProto.ODoHRelay:
@@ -271,7 +272,7 @@ template readLP(ss: StringStream): string =
 
   readStr(ss, readLen)
 
-template readVLP(ss: StringStream, seqStr: var seq[string]) =
+template readVLP[T: string|array[32, byte]](ss: StringStream, seqT: var seq[T]) =
   var next = 0x80'u8
 
   while next == 0x80'u8:
@@ -280,7 +281,14 @@ template readVLP(ss: StringStream, seqStr: var seq[string]) =
     next = next and readLen
     readLen = readLen and 0b01111111
 
-    add(seqStr, readStr(ss, int(readLen)))
+    when T is string:
+      add(seqT, readStr(ss, int(readLen)))
+    else:
+      var tmpArray: array[32, byte]
+
+      read(ss, tmpArray)
+
+      add(seqT, tmpArray)
 
 template toSetStampProps(x: uint64): set[StampProps] =
   when nimvm:
@@ -330,7 +338,7 @@ proc parseStamp*(uri: string): StampObj =
                       providerName: providerName)
   of StampProto.DoH, StampProto.DoT, StampProto.DoQ, StampProto.ODoHTarget, StampProto.ODoHRelay:
     var
-      hashes: seq[string]
+      hashes: seq[array[32, byte]]
       path: string
       bootstrapIps: seq[string]
 
