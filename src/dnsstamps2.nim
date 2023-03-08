@@ -17,32 +17,62 @@ export Port
 
 type
   StampProto* {.pure, size: 1.} = enum
-    PlainDNS = 0x00 ## Plain DNS
-    DNSCrypt = 0x01 ## DNSCrypt
-    DoH = 0x02 ## DNS-over-HTTPS
-    DoT = 0x03 ## DNS-over-TLS
-    DoQ = 0x04 ## DNS-over-QUIC
-    ODoHTarget = 0x05 ## Oblivious DoH target
-    DNSCryptRelay = 0x81 ## Anonymized DNSCrypt relay
-    ODoHRelay = 0x85 ## Oblivious DoH relay
+    ## Is the protocol identifier for:
+    PlainDNS = 0x00
+      ## Plain DNS.
+    DNSCrypt = 0x01
+      ## DNSCrypt.
+    DoH = 0x02
+      ## DNS-over-HTTPS.
+    DoT = 0x03
+      ## DNS-over-TLS.
+    DoQ = 0x04
+      ## DNS-over-QUIC.
+    ODoHTarget = 0x05
+      ## Oblivious DoH target.
+    DNSCryptRelay = 0x81
+      ## Anonymized DNSCrypt relay.
+    ODoHRelay = 0x85
+      ## Oblivious DoH relay.
 
   StampProps* {.pure, size: 8.} = enum
+    ## Informal properties about the resolver (server). It is a combination of the following values:
     DNSSEC # = 1
+      ## The server supports DNSSEC.
     NoLog # = 2
+      ## The server doesn’t keep logs.
     NoFilter # = 4
+      ## The server doesn’t intentionally block domains.
 
   StampObj* = object
+    ## Object with the information of a given resolver (server)
     address*: string
+      ## It's the IP address. In some protocols it can contain the port, when the resolver (server)
+      ## does not use the default port. IPv6 must be enclosed in square brackets [IPv6].
     props*: set[StampProps]
+      ## It is a set with all the informal properties about the resolver (server).
     case protocol*: StampProto
+      ## Is the resolver protocol being represented in the object.
     of StampProto.DoH, StampProto.DoT, StampProto.DoQ, StampProto.ODoHTarget, StampProto.ODoHRelay:
       hashes*: seq[array[32, byte]]
+        ## Is the SHA256 digest of one of the to be signed certificate found in the validation
+        ## chain, typically the certificate used to sign the resolver’s certificate. Multiple hashes
+        ## can be provided for seamless rotations.
       hostname*: string
+        ## Is the server host name which will also be used as a SNI name. If the host name contains
+        ## characters outside the URL-permitted range, these characters should be sent as-is,
+        ## without any extra encoding (neither URL-encoded nor punycode). The port is optional and
+        ## must be specified when it is not the default for the protocol.
       path*: string
+        ## Is the absolute URI path. Only used in `DoH`, `ODoHTarget` and `ODoHRelay` protocols.
       bootstrapIps*: seq[string]
+        ## Are IP addresses of recommended resolvers accessible over standard DNS in order to
+        ## resolve hostname. This is optional, and clients can ignore this information.
     of StampProto.DNSCrypt:
       pk*: array[32, byte]
+        ## Is the DNSCrypt provider’s Ed25519 public key.
       providerName*: string
+        ## Is the DNSCrypt provider name. Must be prefixed with `2.dnscrypt-cert.`.
     else:
       discard
 
