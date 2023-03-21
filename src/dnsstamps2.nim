@@ -77,10 +77,12 @@ type
       discard
 
 const
-  dnsStampUri = "sdns://"
+  dnsStampUriPrefix = "sdns://"
+    ## URI prefix for DNSStamp.
 
 # https://github.com/nim-lang/Nim/issues/6676
 func `==`*(a, b: StampObj): bool =
+  ## Returns `true` if `a` equals `b`.
   result = true
   if a.protocol != b.protocol:
     result = false
@@ -98,6 +100,8 @@ func `==`*(a, b: StampObj): bool =
       discard
 
 proc setAddress(ip: string, port: Port, standardPort: static[Port], address: var string) =
+  ## Defines `address` with `ip` and `port`. If `ip` is IPv6, it will be enclosed in square
+  ## brackets. If `port` is different from `standardPort`, `address` is suffixed with `:port`.
   let ipAddr = parseIpAddress(ip)
 
   case ipAddr.family
@@ -115,6 +119,8 @@ proc setAddress(ip: string, port: Port, standardPort: static[Port], address: var
 
 proc setHostname(hostname: string, port: Port, standardPort: static[Port],
                  varHostname: var string) =
+  ## Defines `varHostname` with `hostname` and `port`. If `port` is different from `standardPort`,
+  ## `address` is suffixed with `:port`.
   add(varHostname, hostname)
 
   if port != standardPort:
@@ -122,6 +128,7 @@ proc setHostname(hostname: string, port: Port, standardPort: static[Port],
     add(varHostname, $port)
 
 proc initPlainDNSStamp*(ip: string, port: Port, props: set[StampProps] = {}): StampObj =
+  ## Initializes a `StampObj` object for Plain DNS (`StampProto.PlainDNS`).
   result = StampObj(
     address: newStringOfCap(47), # [IPv6]:PORT
     props: props,
@@ -131,6 +138,7 @@ proc initPlainDNSStamp*(ip: string, port: Port, props: set[StampProps] = {}): St
 
 proc initDNSCryptStamp*(ip: string, port: Port = Port(443), providerName: string,
                         pk: array[32, byte], props: set[StampProps] = {}): StampObj =
+  ## Initializes a `StampObj` object for DNSCrypt (`StampProto.DNSCrypt`).
   result = StampObj(
     address: newStringOfCap(47), # [IPv6]:PORT
     props: props,
@@ -146,6 +154,7 @@ proc initDNSCryptStamp*(ip: string, port: Port = Port(443), providerName: string
 proc initDoHStamp*(ip: string = "", hostname: string, port: Port = Port(443),
                    hashes: seq[array[32, byte]], path: string = "/dns-query",
                    bootstrapIps: seq[string] = @[], props: set[StampProps] = {}): StampObj =
+  ## Initializes a `StampObj` object for DNS-over-HTTPS (`StampProto.DoH`).
   result = StampObj(
     address: newStringOfCap(39), # IPv6
     props: props,
@@ -163,6 +172,7 @@ proc initDoHStamp*(ip: string = "", hostname: string, port: Port = Port(443),
 proc initDoTStamp*(ip: string = "", hostname: string, port: Port = Port(443),
                    hashes: seq[array[32, byte]], bootstrapIps: seq[string] = @[],
                    props: set[StampProps] = {}): StampObj =
+  ## Initializes a `StampObj` object for DNS-over-TLS (`StampProto.DoT`).
   result = StampObj(
     address: newStringOfCap(39), # IPv6
     props: props,
@@ -180,6 +190,7 @@ proc initDoTStamp*(ip: string = "", hostname: string, port: Port = Port(443),
 proc initDoQStamp*(ip: string = "", hostname: string, port: Port = Port(443),
                    hashes: seq[array[32, byte]], bootstrapIps: seq[string] = @[],
                    props: set[StampProps] = {}): StampObj =
+  ## Initializes a `StampObj` object for DNS-over-QUIC (`StampProto.DoQ`).
   result = StampObj(
     address: newStringOfCap(39), # IPv6
     props: props,
@@ -196,6 +207,7 @@ proc initDoQStamp*(ip: string = "", hostname: string, port: Port = Port(443),
 
 proc initODoHTargetStamp*(hostname: string, port: Port = Port(443), path: string = "/dns-query",
                           props: set[StampProps] = {}): StampObj =
+  ## Initializes a `StampObj` object for Oblivious DoH target (`StampProto.ODoHTarget`).
   result = StampObj(
     address: "",
     props: props,
@@ -208,6 +220,7 @@ proc initODoHTargetStamp*(hostname: string, port: Port = Port(443), path: string
   setHostname(hostname, port, Port(443), result.hostname)
 
 proc initDNSCryptRelayStamp*(ip: string, port: Port = Port(443)): StampObj =
+  ## Initializes a `StampObj` object for Anonymized DNSCrypt relay (`StampProto.DNSCryptRelay`).
   result = StampObj(
     address: newStringOfCap(47), # [IPv6]:PORT
     props: {},
@@ -218,6 +231,7 @@ proc initDNSCryptRelayStamp*(ip: string, port: Port = Port(443)): StampObj =
 proc initODoHRelayStamp*(ip: string = "", hostname: string, port: Port = Port(443),
                          hashes: seq[array[32, byte]], path: string = "/dns-query",
                          bootstrapIps: seq[string] = @[], props: set[StampProps] = {}): StampObj =
+  ## Initializes a `StampObj` object for Oblivious DoH relay (`StampProto.ODoHRelay`).
   result = StampObj(
     address: newStringOfCap(39), # IPv6
     props: props,
@@ -288,7 +302,7 @@ proc toStamp*(stamp: StampObj): string =
 
   setLen(ss.data, getPosition(ss))
 
-  result = dnsStampUri & encode(ss.data, true)
+  result = dnsStampUriPrefix & encode(ss.data, true)
 
   close(ss)
 
@@ -339,11 +353,11 @@ template toSetStampProps(x: uint64): set[StampProps] =
     cast[set[StampProps]](x)
 
 proc parseStamp*(uri: string): StampObj =
-  if not startsWith(uri, dnsStampUri):
+  if not startsWith(uri, dnsStampUriPrefix):
     raise newException(ValueError, "Is Not a valid URI for DNS Stamp")
 
   var
-    ss = newStringStream(decode(uri[len(dnsStampUri)..^1]))
+    ss = newStringStream(decode(uri[len(dnsStampUriPrefix)..^1]))
     props: set[StampProps]
     address: string
 
