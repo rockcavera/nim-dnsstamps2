@@ -130,8 +130,14 @@ proc setHostname(hostname: string, port: Port, standardPort: static[Port],
     add(varHostname, ':')
     add(varHostname, $port)
 
-proc initPlainDNSStamp*(ip: string, port: Port, props: set[StampProps] = {}): StampObj =
+proc initPlainDNSStamp*(ip: string, port: Port = Port(53), props: set[StampProps] = {}): StampObj =
   ## Initializes a `StampObj` for Plain DNS (`StampProto.PlainDNS`).
+  ##
+  ## **Parameters**
+  ## - `ip` is the IPv4 or IPv6 address of the server.
+  ## - `port` is the server port.
+  ## - `props` is a `set` that represents informal properties about the resolver. See
+  ##   `StampProps<#StampProps>`_.
   result = StampObj(
     address: newStringOfCap(47), # [IPv6]:PORT
     props: props,
@@ -139,9 +145,17 @@ proc initPlainDNSStamp*(ip: string, port: Port, props: set[StampProps] = {}): St
 
   setAddress(ip, port, Port(53), result.address)
 
-proc initDNSCryptStamp*(ip: string, port: Port = Port(443), providerName: string,
-                        pk: array[32, byte], props: set[StampProps] = {}): StampObj =
+proc initDNSCryptStamp*(ip: string, providerName: string, pk: array[32, byte],
+                        port: Port = Port(443), props: set[StampProps] = {}): StampObj =
   ## Initializes a `StampObj` for DNSCrypt (`StampProto.DNSCrypt`).
+  ##
+  ## **Parameters**
+  ## - `ip` is the IPv4 or IPv6 address of the server.
+  ## - `providerName` is the DNSCrypt provider name.
+  ## - `pk` is the provider's Ed25519 public key.
+  ## - `port` is the server port.
+  ## - `props` is a `set` that represents informal properties about the resolver. See
+  ##   `StampProps<#StampProps>`_.
   result = StampObj(
     address: newStringOfCap(47), # [IPv6]:PORT
     props: props,
@@ -154,10 +168,23 @@ proc initDNSCryptStamp*(ip: string, port: Port = Port(443), providerName: string
   if not startsWith(providerName, "2.dnscrypt-cert."):
     result.providerName = "2.dnscrypt-cert." & providerName
 
-proc initDoHStamp*(ip: string = "", hostname: string, port: Port = Port(443),
-                   hashes: seq[array[32, byte]], path: string = "/dns-query",
+proc initDoHStamp*(ip: string = "", hostname: string,  hashes: seq[array[32, byte]],
+                   port: Port = Port(443), path: string = "/dns-query",
                    bootstrapIps: seq[string] = @[], props: set[StampProps] = {}): StampObj =
   ## Initializes a `StampObj` for DNS-over-HTTPS (`StampProto.DoH`).
+  ##
+  ## **Parameters**
+  ## - `ip` is the IPv4 or IPv6 address of the server. It can be an empty string, in which case the
+  ##   `hostname` will be resolved to get the IP address of the server.
+  ## - `hostname` is the hostname of the server.
+  ## - `hashes` is a `seq` with one or more SHA256 digest of one of the TBS certificate found in the
+  ##   validation chain, typically the certificate used to sign the resolver’s certificate.
+  ## - `port` is the server port.
+  ## - `path` is the absolute URI path.
+  ## - `bootstrapIps` is a `seq` with recommended IP addresses to resolve `hostname` via standard
+  ##   DNS. It is optional and can be empty.
+  ## - `props` is a `set` that represents informal properties about the resolver. See
+  ##   `StampProps<#StampProps>`_.
   result = StampObj(
     address: newStringOfCap(39), # IPv6
     props: props,
@@ -172,10 +199,22 @@ proc initDoHStamp*(ip: string = "", hostname: string, port: Port = Port(443),
 
   setHostname(hostname, port, Port(443), result.hostname)
 
-proc initDoTStamp*(ip: string = "", hostname: string, port: Port = Port(443),
-                   hashes: seq[array[32, byte]], bootstrapIps: seq[string] = @[],
+proc initDoTStamp*(ip: string = "", hostname: string, hashes: seq[array[32, byte]],
+                   port: Port = Port(443), bootstrapIps: seq[string] = @[],
                    props: set[StampProps] = {}): StampObj =
   ## Initializes a `StampObj` for DNS-over-TLS (`StampProto.DoT`).
+  ##
+  ## **Parameters**
+  ## - `ip` is the IPv4 or IPv6 address of the server. It can be an empty string, in which case the
+  ##   `hostname` will be resolved to get the IP address of the server.
+  ## - `hostname` is the hostname of the server.
+  ## - `hashes` is a `seq` with one or more SHA256 digest of one of the TBS certificate found in the
+  ##   validation chain, typically the certificate used to sign the resolver’s certificate.
+  ## - `port` is the server port.
+  ## - `bootstrapIps` is a `seq` with recommended IP addresses to resolve `hostname` via standard
+  ##   DNS. It is optional and can be empty.
+  ## - `props` is a `set` that represents informal properties about the resolver. See
+  ##   `StampProps<#StampProps>`_.
   result = StampObj(
     address: newStringOfCap(39), # IPv6
     props: props,
@@ -190,10 +229,22 @@ proc initDoTStamp*(ip: string = "", hostname: string, port: Port = Port(443),
 
   setHostname(hostname, port, Port(443), result.hostname)
 
-proc initDoQStamp*(ip: string = "", hostname: string, port: Port = Port(443),
-                   hashes: seq[array[32, byte]], bootstrapIps: seq[string] = @[],
+proc initDoQStamp*(ip: string = "", hostname: string, hashes: seq[array[32, byte]],
+                   port: Port = Port(443), bootstrapIps: seq[string] = @[],
                    props: set[StampProps] = {}): StampObj =
   ## Initializes a `StampObj` for DNS-over-QUIC (`StampProto.DoQ`).
+  ##
+  ## **Parameters**
+  ## - `ip` is the IPv4 or IPv6 address of the server. It can be an empty string, in which case the
+  ##   `hostname` will be resolved to get the IP address of the server.
+  ## - `hostname` is the hostname of the server.
+  ## - `hashes` is a `seq` with one or more SHA256 digest of one of the TBS certificate found in the
+  ##   validation chain, typically the certificate used to sign the resolver’s certificate.
+  ## - `port` is the server port.
+  ## - `bootstrapIps` is a `seq` with recommended IP addresses to resolve `hostname` via standard
+  ##   DNS. It is optional and can be empty.
+  ## - `props` is a `set` that represents informal properties about the resolver. See
+  ##   `StampProps<#StampProps>`_.
   result = StampObj(
     address: newStringOfCap(39), # IPv6
     props: props,
@@ -211,6 +262,13 @@ proc initDoQStamp*(ip: string = "", hostname: string, port: Port = Port(443),
 proc initODoHTargetStamp*(hostname: string, port: Port = Port(443), path: string = "/dns-query",
                           props: set[StampProps] = {}): StampObj =
   ## Initializes a `StampObj` for Oblivious DoH target (`StampProto.ODoHTarget`).
+  ##
+  ## **Parameters**
+  ## - `hostname` is the hostname of the server.
+  ## - `port` is the server port.
+  ## - `path` is the absolute URI path.
+  ## - `props` is a `set` that represents informal properties about the resolver. See
+  ##   `StampProps<#StampProps>`_.
   result = StampObj(
     address: "",
     props: props,
@@ -224,6 +282,10 @@ proc initODoHTargetStamp*(hostname: string, port: Port = Port(443), path: string
 
 proc initDNSCryptRelayStamp*(ip: string, port: Port = Port(443)): StampObj =
   ## Initializes a `StampObj` for Anonymized DNSCrypt relay (`StampProto.DNSCryptRelay`).
+  ##
+  ## **Parameters**
+  ## - `ip` is the IPv4 or IPv6 of the relay server.
+  ## - `port` is the relay server port.
   result = StampObj(
     address: newStringOfCap(47), # [IPv6]:PORT
     props: {},
@@ -231,10 +293,23 @@ proc initDNSCryptRelayStamp*(ip: string, port: Port = Port(443)): StampObj =
 
   setAddress(ip, port, Port(443), result.address)
 
-proc initODoHRelayStamp*(ip: string = "", hostname: string, port: Port = Port(443),
-                         hashes: seq[array[32, byte]], path: string = "/dns-query",
+proc initODoHRelayStamp*(ip: string = "", hostname: string, hashes: seq[array[32, byte]],
+                         port: Port = Port(443), path: string = "/dns-query",
                          bootstrapIps: seq[string] = @[], props: set[StampProps] = {}): StampObj =
   ## Initializes a `StampObj` for Oblivious DoH relay (`StampProto.ODoHRelay`).
+  ##
+  ## **Parameters**
+  ## - `ip` is the IPv4 or IPv6 address of the relay server. It can be an empty string, in which case the
+  ##   `hostname` will be resolved to get the IP address of the relay server.
+  ## - `hostname` is the hostname of the relay server.
+  ## - `hashes` is a `seq` with one or more SHA256 digest of one of the TBS certificate found in the
+  ##   validation chain, typically the certificate used to sign the resolver’s certificate.
+  ## - `port` is the relay server port.
+  ## - `path` is the absolute URI path.
+  ## - `bootstrapIps` is a `seq` with recommended IP addresses to resolve `hostname` via standard
+  ##   DNS. It is optional and can be empty.
+  ## - `props` is a `set` that represents informal properties about the resolver. See
+  ##   `StampProps<#StampProps>`_.
   result = StampObj(
     address: newStringOfCap(39), # IPv6
     props: props,
