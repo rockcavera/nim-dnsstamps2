@@ -1,14 +1,29 @@
-# https://dnscrypt.info/stamps-specifications/
-
-# "sdns://" || base64url(0x00 || props || LP(addr [:port]))
-# "sdns://" || base64url(0x01 || props || LP(addr [:port]) || LP(pk) || LP(providerName))
-# "sdns://" || base64url(0x02 || props || LP(addr) || VLP(hash1, hash2, ...hashn) || LP(hostname [:port]) || LP(path) [ || VLP(bootstrap_ip1, bootstrap_ip2, ...bootstrap_ipn) ])
-# "sdns://" || base64url(0x03 || props || LP(addr) || VLP(hash1, hash2, ...hashn) || LP(hostname [:port]) ||          [ || VLP(bootstrap_ip1, bootstrap_ip2, ...bootstrap_ipn) ])
-# "sdns://" || base64url(0x04 || props || LP(addr) || VLP(hash1, hash2, ...hashn) || LP(hostname [:port]) ||          [ || VLP(bootstrap_ip1, bootstrap_ip2, ...bootstrap_ipn) ])
-# "sdns://" || base64url(0x05 || props ||                                            LP(hostname [:port]) || LP(path))
-# "sdns://" || base64url(0x81 ||          LP(addr))
-# "sdns://" || base64url(0x85 || props || LP(addr) || VLP(hash1, hash2, ...hashn) || LP(hostname [:port]) || LP(path) [ || VLP(bootstrap_ip1, bootstrap_ip2, ...bootstrap_ipn) ])
-
+## DNS Stamps is a specification that aims to encode all the data needed to connect to a DNS server
+## in a single string (URI).
+##
+## The implementation is based on the specifications contained [here](https://dnscrypt.info/stamps-specifications/).
+##
+## Basic Use
+## =========
+## Creating a `StampObj` for Google's public DNS resolver and turning it into a string:
+## ```nim
+## import dnsstamps2
+##
+## let stamp = initPlainDNSStamp("8.8.8.8", Port(53), {StampProps.DNSSEC})
+##
+## echo toStamp(stamp)
+## ```
+##
+## Parsing a DNS Stamp string to get all the specifications of a DNS resolver inside a `StampObj`:
+## ```nim
+## import dnsstamps2
+##
+## const strStamp = "sdns://AAEAAAAAAAAABzguOC44Ljg"
+##
+## let stamp = parseStamp(strStamp)
+##
+## echo stamp
+## ```
 import std/[base64, net, streams, strutils]
 
 import pkg/stew/endians2
@@ -83,21 +98,15 @@ const
 # https://github.com/nim-lang/Nim/issues/6676
 func `==`*(a, b: StampObj): bool =
   ## Returns `true` if `a` equals `b`.
-  result = true
-  if a.protocol != b.protocol:
-    result = false
-  elif a.address != b.address:
-    result = false
-  elif a.props != b.props:
-    result = false
+  result = (a.protocol == b.protocol) and (a.address == b.address) and (a.props == b.props)
+  case a.protocol
+  of StampProto.DoH, StampProto.DoT, StampProto.DoQ, StampProto.ODoHTarget, StampProto.ODoHRelay:
+    result = result and (a.hashes == b.hashes) and (a.hostname == b.hostname) and
+             (a.path == b.path) and (a.bootstrapIps == b.bootstrapIps)
+  of StampProto.DNSCrypt:
+    result = result and (a.pk == b.pk) and (a.providerName == b.providerName)
   else:
-    case a.protocol
-    of StampProto.DoH, StampProto.DoT, StampProto.DoQ, StampProto.ODoHTarget, StampProto.ODoHRelay:
-      result = (a.hashes == b.hashes) and (a.hostname == b.hostname) and (a.path == b.path) and (a.bootstrapIps == b.bootstrapIps)
-    of StampProto.DNSCrypt:
-      result = (a.pk == b.pk) and (a.providerName == b.providerName)
-    else:
-      discard
+    discard
 
 proc setAddress(ip: string, port: Port, standardPort: static[Port], address: var string) =
   ## Defines `address` with `ip` and `port`. If `ip` is IPv6, it will be enclosed in square
