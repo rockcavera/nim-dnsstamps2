@@ -1,5 +1,5 @@
-## DNS Stamps is a specification that aims to encode all the data needed to connect to a DNS server
-## in a single string (URI).
+## DNS Stamps is a specification that aims to encode all the data needed to access a DNS server in a
+## single string (URI).
 ##
 ## The implementation is based on the specifications contained [here](https://dnscrypt.info/stamps-specifications/).
 ##
